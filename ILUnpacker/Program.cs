@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using dnlib.DotNet;
 using dnlib.DotNet.Emit;
+using OpCodes = dnlib.DotNet.Emit.OpCodes;
 
 namespace ILUnpacker
 {
@@ -13,6 +16,8 @@ namespace ILUnpacker
         private static AssemblyWriter _assemblyWriter;
 
         private static Assembly _assembly;
+
+        private static bool RunningILPMethod = false;
 
         internal static MethodDef _executingMethod;
 
@@ -23,18 +28,24 @@ namespace ILUnpacker
 
             string path = args[0];
 
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine("ILUnpacker - fixed by 3dsboy08 @ tuts4you.com");
+            Console.ForegroundColor = ConsoleColor.Gray;
+
             _assemblyWriter = new AssemblyWriter(path);
 
             _assembly = Assembly.LoadFrom(path);
 
-            Console.WriteLine("Unpacking..");
+            Console.WriteLine("[*] Setting up unpacker...");
 
             var stringDecrypter = new StringDecrypter(_assembly);
-
-            Memory.Hook(typeof(StackFrame).GetMethod("GetMethod", BindingFlags.Instance | BindingFlags.Public),
-                typeof(Program).GetMethod("HookGetMethod", BindingFlags.Instance | BindingFlags.Public));
+            
+	        Memory.Hook(typeof(StackFrame).GetMethod("GetMethod", BindingFlags.Instance | BindingFlags.Public),
+	        	typeof(Program).GetMethod("HookGetMethod", BindingFlags.Instance | BindingFlags.Public));
 
             int invokeToken = 0;
+
+            Console.WriteLine("[*] Unpacking...");
 
             var types = _assemblyWriter.ModuleDef.GetTypes();
             var typeDefs = types as IList<TypeDef> ?? types.ToList();
@@ -74,7 +85,7 @@ namespace ILUnpacker
 
             _assemblyWriter.Save();
 
-            Console.WriteLine("Unpacked file!");
+            Console.WriteLine("[*] Unpacking complete!");
 
             Console.Read();
         }

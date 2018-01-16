@@ -7,43 +7,33 @@ namespace ILUnpacker
 {
     internal static class Memory
     {
-        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
-        private static extern bool VirtualProtect(
-            IntPtr lpAddress,
-            IntPtr dwSize,
-            uint flNewProtect,
-            out uint lpflOldProtect
-        );
+        [DllImport("ILUnpackerNative-x86.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern void ILUnpacker_SetHook86(IntPtr from, IntPtr to);
 
-        internal static unsafe void Hook(MethodBase from, MethodBase to)
+        [DllImport("ILUnpackerNative-x64.dll", CallingConvention = CallingConvention.FastCall)]
+        public static extern void ILUnpacker_SetHook64(IntPtr from, IntPtr to);
+
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr LoadLibrary(string dllToLoad);
+
+        internal static void Hook(MethodBase from, MethodBase to)
         {
-            IntPtr intPtr = GetAddress(from);
-            IntPtr intPtr2 = GetAddress(to);
+            LoadLibrary(IntPtr.Size == 4 ? "ILUnpackerNative-x86.dll" : "ILUnpackerNative-x64.dll");
 
-            VirtualProtect(intPtr, (IntPtr) 5, 0x40, out var lpflOldProtect);
+            var intPtr = GetAddress(from);
+            var intPtr2 = GetAddress(to);
 
-            if (IntPtr.Size == 8)
+            if (IntPtr.Size == 4)
             {
-                byte* ptr = (byte*) intPtr.ToPointer();
-                *ptr = 0x49;
-                ptr[1] = 0xbb;
-                *(long*) (ptr + 0x2) = intPtr2.ToInt64();
-                ptr[10] = 0x41;
-                ptr[11] = 0xff;
-                ptr[12] = 0xe3;
+                ILUnpacker_SetHook86(intPtr, intPtr2);
             }
-            else if (IntPtr.Size == 4)
+            else
             {
-                byte* ptr = (byte*) intPtr.ToPointer();
-                *ptr = 0xe9;
-                *(long*) (ptr + 0x1) = intPtr2.ToInt32() - intPtr.ToInt32() - 5;
-                ptr[5] = 0xc3;
+                ILUnpacker_SetHook64(intPtr, intPtr2);
             }
-
-            VirtualProtect(intPtr, (IntPtr) 5, lpflOldProtect, out var _);
         }
 
-        private static IntPtr GetAddress(MethodBase methodBase)
+        public static IntPtr GetAddress(MethodBase methodBase)
         {
             RuntimeHelpers.PrepareMethod(methodBase.MethodHandle);
             return methodBase.MethodHandle.GetFunctionPointer();
